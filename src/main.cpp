@@ -17,6 +17,8 @@ Servo my_servo;
 TwoWire Wire0 = TwoWire(0);
 TwoWire Wire1 = TwoWire(1);
 
+const uint8_t SDA0 = 34;
+const uint8_t SCL0 = 36;
 const uint8_t SDA1 = 17;
 const uint8_t SCL1 = 16;
 const uint8_t servo_pin = 12;
@@ -26,8 +28,8 @@ void setup()
   Serial.begin(9600);
 
   // Second sensor PWM set up 
-  Wire0.begin();
-  Wire0.begin(SDA1, SCL1, 100000);
+  Wire0.begin(SDA0, SCL0, 100000);
+  Wire1.begin(SDA1, SCL1, 100000);
   my_servo.attach(servo_pin);
 }
 
