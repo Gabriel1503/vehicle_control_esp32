@@ -22,7 +22,7 @@ class PIDController
     umax = umaxIn;
   }
 
-  void evalActVar(int8_t value, int8_t target, int8_t &comm, float deltaT)
+  void evalActVar(int8_t value, int8_t target, int8_t &comm, int8_t &dir, float deltaT)
   {
     // error of the control value
     int16_t e = target - value;
@@ -39,6 +39,10 @@ class PIDController
     // commad for the motor
     comm = fabs(u);
     if(comm > umax) comm = umax;
+
+    // direction of rtation depending on the u value
+    dir = 1;
+    if(u < 0) dir = -1;
 
     eprev = e;
   }
