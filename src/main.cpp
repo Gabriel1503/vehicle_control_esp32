@@ -11,9 +11,37 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(1), kd(1), ki(1), umax(100){}
+  PIDController(): kp(1), kd(1), ki(1), umax(180){}
 
+  // function to set parameters
+  void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
+  {
+    kp = kpIn;
+    kd = kdIn;
+    ki = kiIn;
+    umax = umaxIn;
+  }
 
+  void evalActVar(int8_t value, int8_t target, int8_t &comm, float deltaT)
+  {
+    // error of the control value
+    int16_t e = target - value;
+    
+    // derivative of the error
+    float dedt = (e - eprev)/(deltaT);
+
+    // integral of the error
+    eintegral = eintegral + e*deltaT;
+
+    // control signal
+    float u = kp*e + kd*dedt + ki*eintegral;
+
+    // commad for the motor
+    comm = fabs(u);
+    if(comm > umax) comm = umax;
+
+    eprev = e;
+  }
 };
 
 const uint8_t SDA_0 = 25;
