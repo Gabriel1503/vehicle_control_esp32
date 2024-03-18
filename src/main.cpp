@@ -3,6 +3,19 @@
 #include<Wire.h>
 #include<ESP32Servo.h>
 
+class PIDController
+{
+  private:
+    float kp, kd, ki, umax; // constants that define the controller dynamics
+    float eprev, eintegral; // previous error and integral error, utilized for the derivative and integral calculations respectively
+  
+  public:
+  // constructor
+  PIDController(): kp(1), kd(1), ki(1), umax(100){}
+
+
+};
+
 const uint8_t SDA_0 = 25;
 const uint8_t SCL_0 = 26;
 const uint8_t SDA_1 = 17;
@@ -44,4 +57,3 @@ void loop()
 //  Serial.print(" ");
 //  Serial.println(as5600.rawAngle() * AS5600_RAW_TO_DEGREES);
 }
-//  -- END OF FILE --
