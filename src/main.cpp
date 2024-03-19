@@ -89,3 +89,26 @@ void loop()
 //  Serial.print(" ");
 //  Serial.println(as5600.rawAngle() * AS5600_RAW_TO_DEGREES);
 }
+
+
+int8_t readAngleOnSerial()
+{
+  String inString;
+  int8_t Setpoint;
+
+  if(Serial.available() > 0)
+  {
+    int inChar = Serial.read();
+    if (isDigit(inChar)) {
+      // convert the incoming byte to a char and add it to the string:
+      inString += (char)inChar;
+    }
+    // if you get a newline, print the string, then the string's value:
+    if (inChar == '\n') {
+      Setpoint = inString.toInt(); // Setpoint - desired angle
+      // clear the string for new input:
+      inString = "";
+    }
+    return Setpoint;
+  }
+}
