@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(1), kd(1), ki(1), umax(180){}
+  PIDController(): kp(1), kd(1), ki(1), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -48,11 +48,16 @@ class PIDController
   }
 };
 
+int8_t readAngleOnSerial();
+
 const uint8_t SDA_0 = 25;
 const uint8_t SCL_0 = 26;
 const uint8_t SDA_1 = 17;
 const uint8_t SCL_1 = 16;
 const uint8_t servo_pin = 12;
+int16_t set_point;
+int16_t angle_encoder_1;
+int16_t angle_encoder_2;
 
 TwoWire my_Wire0 = TwoWire(0);
 TwoWire my_Wire1 = TwoWire(1);
@@ -77,11 +82,17 @@ void setup()
   // Second sensor PWM set up 
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
+
+  // Initialize the PID controllers for each motor
+  PIDController pid_motor_1;
+  PIDController pid_motor_2;
 }
 
 
 void loop()
 {
+  readAngleOnSerial();
+
   my_servo.write(180);
   Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
   Serial.print(" ");
