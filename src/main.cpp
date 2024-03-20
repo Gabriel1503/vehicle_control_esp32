@@ -22,7 +22,7 @@ class PIDController
     umax = umaxIn;
   }
 
-  void evalActVar(int8_t value, int8_t target, int8_t &comm, int8_t &dir, float deltaT)
+  void evalActVar(int16_t value, int16_t target, int8_t &comm, float deltaT)
   {
     // error of the control value
     int16_t e = target - value;
@@ -37,34 +37,45 @@ class PIDController
     float u = kp*e + kd*dedt + ki*eintegral;
 
     // commad for the motor
-    comm = fabs(u);
+    comm = (int) fabs(u);
     if(comm > umax) comm = umax;
-
-    // direction of rtation depending on the u value
-    dir = 1;
-    if(u < 0) dir = -1;
+    if(comm < umax*-1) comm = -1*umax;
 
     eprev = e;
   }
 };
 
-int8_t readAngleOnSerial();
+/*******************Auxiliary function prototypes****************************************************************/
+int16_t readAngleOnSerial();
+/****************************************************************************************************************/
 
+// variables for the connection interface of the sensors
 const uint8_t SDA_0 = 25;
 const uint8_t SCL_0 = 26;
 const uint8_t SDA_1 = 17;
 const uint8_t SCL_1 = 16;
 const uint8_t servo_pin = 12;
+// variables used for angle control
 int16_t set_point;
 int16_t angle_encoder_1;
 int16_t angle_encoder_2;
+float prevT;
+float deltaT;
+long currT;
+int8_t comm;
+int8_t servo_comm;
 
+// Initialization of the two wire objects for the ESP32
 TwoWire my_Wire0 = TwoWire(0);
 TwoWire my_Wire1 = TwoWire(1);
-
+// Initialize the sensors
 AS5600 as5600(&my_Wire0);   //  use default Wire
 AS5600 as56001(&my_Wire1); // will use a different wire in the ESP32
+// Initialize the servo object for test
 Servo my_servo;
+// Initialize the PID controllers for each motor
+PIDController pid_motor_1;
+PIDController pid_motor_2;
 
 void setup()
 {
@@ -83,17 +94,21 @@ void setup()
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
 
-  // Initialize the PID controllers for each motor
-  PIDController pid_motor_1;
-  PIDController pid_motor_2;
 }
 
 
 void loop()
 {
-  readAngleOnSerial();
+  // geting time stamp
+  currT = micros();
+  deltaT = (currT - prevT)/1.0e6;  
+  // read angle and set point from the Serial port
+  angle_encoder_1 = as5600.rawAngle()*AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
+  readAngleOnSerial(set_point);
+  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
 
-  my_servo.write(180);
+  servo_comm = map(comm, -100, 100, 0, 180);
+  my_servo.write(servo_comm);
   Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
   Serial.print(" ");
   Serial.println(as56001.rawAngle()*AS5600_RAW_TO_DEGREES);
@@ -102,10 +117,9 @@ void loop()
 }
 
 
-int8_t readAngleOnSerial()
+void readAngleOnSerial(int16_t &set_point)
 {
   String inString;
-  int8_t Setpoint;
 
   if(Serial.available() > 0)
   {
@@ -116,10 +130,9 @@ int8_t readAngleOnSerial()
     }
     // if you get a newline, print the string, then the string's value:
     if (inChar == '\n') {
-      Setpoint = inString.toInt(); // Setpoint - desired angle
+      set_point = inString.toInt(); 
+      Serial.println(inString);
       // clear the string for new input:
-      inString = "";
     }
-    return Setpoint;
   }
 }
