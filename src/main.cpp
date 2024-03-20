@@ -46,7 +46,7 @@ class PIDController
 };
 
 /*******************Auxiliary function prototypes****************************************************************/
-int16_t readAngleOnSerial();
+void readAngleOnSerial(int16_t &set_point);
 /****************************************************************************************************************/
 
 // variables for the connection interface of the sensors
@@ -109,9 +109,9 @@ void loop()
 
   servo_comm = map(comm, -100, 100, 0, 180);
   my_servo.write(servo_comm);
-  Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
-  Serial.print(" ");
-  Serial.println(as56001.rawAngle()*AS5600_RAW_TO_DEGREES);
+  // Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
+  // Serial.print(" ");
+  // Serial.println(as56001.rawAngle()*AS5600_RAW_TO_DEGREES);
 //  Serial.print(" ");
 //  Serial.println(as5600.rawAngle() * AS5600_RAW_TO_DEGREES);
 }
@@ -123,6 +123,7 @@ void readAngleOnSerial(int16_t &set_point)
 
   if(Serial.available() > 0)
   {
+    Serial.println("inside the if");
     int inChar = Serial.read();
     if (isDigit(inChar)) {
       // convert the incoming byte to a char and add it to the string:
