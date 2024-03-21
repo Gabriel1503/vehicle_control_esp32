@@ -64,6 +64,7 @@ float deltaT;
 long currT;
 int8_t comm;
 int8_t servo_comm;
+String in_string = "";
 
 // Initialization of the two wire objects for the ESP32
 TwoWire my_Wire0 = TwoWire(0);
@@ -119,20 +120,20 @@ void loop()
 
 void readAngleOnSerial(int16_t &set_point)
 {
-  String inString;
-
-  if(Serial.available() > 0)
+  while (Serial.available() > 0) 
   {
-    Serial.println("inside the if");
-    int inChar = Serial.read();
-    if (isDigit(inChar)) {
+    int in_char = Serial.read();
+    if (isDigit(in_char))
+    {
       // convert the incoming byte to a char and add it to the string:
-      inString += (char)inChar;
+      in_string += (char)in_char;
     }
     // if you get a newline, print the string, then the string's value:
-    if (inChar == '\n') {
-      set_point = inString.toInt(); 
-      Serial.println(inString);
+    if (in_char == '\n')
+    {
+      set_point = in_string.toInt(); 
+      Serial.println(set_point);
+      in_string = "";
       // clear the string for new input:
     }
   }
