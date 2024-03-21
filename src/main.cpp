@@ -21,6 +21,14 @@ class PIDController
     ki = kiIn;
     umax = umaxIn;
   }
+  
+  void showParameters()
+  {
+    Serial.println(kp);
+    Serial.println(kd);
+    Serial.println(ki);
+    Serial.println(umax);
+  }
 
   void evalActVar(int16_t value, int16_t target, int8_t &comm, float deltaT)
   {
@@ -123,7 +131,7 @@ void readAngleOnSerial(int16_t &set_point)
   while (Serial.available() > 0) 
   {
     int in_char = Serial.read();
-    if (isDigit(in_char))
+    if (isDigit(in_char) || in_char == '-')
     {
       // convert the incoming byte to a char and add it to the string:
       in_string += (char)in_char;
