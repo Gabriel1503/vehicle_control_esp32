@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(1), kd(1), ki(1), umax(100){}
+  PIDController(): kp(1), kd(0.3), ki(0.5), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -47,7 +47,9 @@ class PIDController
     // commad for the motor
     comm = (int) fabs(u);
     if(comm > umax) comm = umax;
-    if(comm < umax*-1) comm = -1*umax;
+    if(comm < (umax * -1)) comm = -1*umax;
+    
+    if(e == 0) Serial.println(value);
 
     eprev = e;
   }
@@ -55,6 +57,7 @@ class PIDController
 
 /*******************Auxiliary function prototypes****************************************************************/
 void readAngleOnSerial(int16_t &set_point);
+void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
 /****************************************************************************************************************/
 
 // variables for the connection interface of the sensors
@@ -71,7 +74,7 @@ float prevT;
 float deltaT;
 long currT;
 int8_t comm;
-int8_t servo_comm;
+uint8_t servo_comm;
 String in_string = "";
 
 // Initialization of the two wire objects for the ESP32
@@ -116,7 +119,7 @@ void loop()
   readAngleOnSerial(set_point);
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
 
-  servo_comm = map(comm, -100, 100, 0, 180);
+  my_map(servo_comm, comm, -100, 100, 0, 180);
   my_servo.write(servo_comm);
   // Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
   // Serial.print(" ");
@@ -145,4 +148,12 @@ void readAngleOnSerial(int16_t &set_point)
       // clear the string for new input:
     }
   }
+}
+
+void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max)
+{
+  const uint8_t run = in_max - in_min;
+  const uint8_t rise = out_max - out_min;
+  const uint8_t delta = in - in_min;
+  out = (delta * rise) /(run + out_min);
 }
