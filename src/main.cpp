@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(1), kd(0.3), ki(0.5), umax(100){}
+  PIDController(): kp(1), kd(0), ki(0), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -55,7 +55,7 @@ class PIDController
   }
 };
 
-/*******************Auxiliary function prototypes****************************************************************/
+/*******************************************Auxiliary function prototypes****************************************/
 void readAngleOnSerial(int16_t &set_point);
 void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
 /****************************************************************************************************************/
