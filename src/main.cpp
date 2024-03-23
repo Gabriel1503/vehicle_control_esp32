@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(1), kd(0), ki(0), umax(100){}
+  PIDController(): kp(0.3), kd(0.025), ki(0.01), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -48,8 +48,6 @@ class PIDController
     comm = (int) fabs(u);
     if(comm > umax) comm = umax;
     if(comm < (umax * -1)) comm = -1*umax;
-    
-    if(e == 0) Serial.println(value);
 
     eprev = e;
   }
@@ -105,6 +103,7 @@ void setup()
   // Second sensor PWM set up 
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
+  as5600.resetCumulativePosition();
 
 }
 
@@ -114,18 +113,13 @@ void loop()
   // geting time stamp
   currT = micros();
   deltaT = (currT - prevT)/1.0e6;  
+  prevT = currT;
   // read angle and set point from the Serial port
-  angle_encoder_1 = as5600.rawAngle()*AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
+  angle_encoder_1 = as5600.rawAngle() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
   readAngleOnSerial(set_point);
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
-
   my_map(servo_comm, comm, -100, 100, 0, 180);
   my_servo.write(servo_comm);
-  // Serial.print(as5600.rawAngle()*AS5600_RAW_TO_DEGREES);   //Serial output to visualize in Serial Plotter
-  // Serial.print(" ");
-  // Serial.println(as56001.rawAngle()*AS5600_RAW_TO_DEGREES);
-//  Serial.print(" ");
-//  Serial.println(as5600.rawAngle() * AS5600_RAW_TO_DEGREES);
 }
 
 
