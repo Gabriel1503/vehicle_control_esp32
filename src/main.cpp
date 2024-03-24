@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(0.3), kd(0.025), ki(0.01), umax(100){}
+  PIDController(): kp(5.), kd(0), ki(0), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -73,6 +73,11 @@ float deltaT;
 long currT;
 int8_t comm;
 uint8_t servo_comm;
+uint8_t quadrant_number;
+uint8_t previous_quadrant_number;
+uint8_t number_of_turns;
+int32_t total_angle1;
+int32_t input;
 String in_string = "";
 
 // Initialization of the two wire objects for the ESP32
@@ -120,8 +125,53 @@ void loop()
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
   my_map(servo_comm, comm, -100, 100, 0, 180);
   my_servo.write(servo_comm);
-}
+  // Quadrant 1
+  if (angle_encoder_1 >= 0 && angle_encoder_1 <= 90)
+  {
+    quadrant_number = 1;
+  }
+  // Quadrant 2
+  if (angle_encoder_1 >= 90 && angle_encoder_1 <= 180) 
+  {
+    quadrant_number = 2;
+  }
+  // Quadrant 3
+  if (angle_encoder_1 >= 180 && angle_encoder_1 <= 270) 
+  {
+    quadrant_number = 3;
+  }
+  // Quadrant 4
+  if (angle_encoder_1 >= 270 && angle_encoder_1 <= 360) 
+  {
+     quadrant_number = 4;
+  }
 
+  if (quadrant_number != previous_quadrant_number)
+  {
+    // Transition from 4th to 1st quadrant
+    if (quadrant_number == 1 && previous_quadrant_number == 4)
+    {
+      number_of_turns++;
+    }
+    // Transition from 1st to 4th quadrant
+    if (quadrant_number == 4 && previous_quadrant_number == 1)
+    {
+      number_of_turns--;
+    }
+    previous_quadrant_number = quadrant_number;
+  }
+  if (total_angle1 >= 0)
+  {
+    total_angle1 = (number_of_turns * 360) + angle_encoder_1;
+  }
+  else
+  {
+    total_angle1 = (number_of_turns * 360) + angle_encoder_1;
+  }
+
+  // Establish Input value for PID
+  input = total_angle1;
+}
 
 void readAngleOnSerial(int16_t &set_point)
 {
