@@ -3,6 +3,12 @@
 #include<Wire.h>
 #include<ESP32Servo.h>
 
+
+/*******************************************Auxiliary function prototypes****************************************/
+void readAngleOnSerial(int16_t &set_point);
+void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
+/****************************************************************************************************************/
+
 class PIDController
 {
   private:
@@ -11,7 +17,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(2), kd(0.2), ki(1), umax(100), eintegral(0){}
+  PIDController(): kp(5), kd(0), ki(0), umax(100), eintegral(0){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -22,52 +28,38 @@ class PIDController
     umax = umaxIn;
   }
   
-  void showParameters()
+  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3])
   {
-    // Serial.print(kp);
-    // Serial.print("\t");
-    // Serial.print(kd);
-    // Serial.print("\t");
-    // Serial.print(ki);
-    // Serial.print("\t");
-    // Serial.print(umax);
-    // Serial.print("\t");
-    Serial.print("Previous e");
-    Serial.print("\t");
-    Serial.println("Integral e");
-    Serial.print(eprev);
-    Serial.print("\t");
-    Serial.print("\t");
-    Serial.println(eintegral);
-  }
-
-  void evalActVar(int16_t value, int16_t target, int8_t &comm, float deltaT)
-  {
+    // geting timer values
+    timers[0] = micros(); // current time
+    timers[1] = (timers[0] - timers[2]); // delta t since previos time 
+    timers[2] = timers[0]; // previous time for next iteration is the current time
+    int8_t comm_raw;
     // error of the control value
     int16_t e = target - value;
     
     // derivative of the error
-    float dedt = (e - eprev)/(deltaT);
+    float dedt = (e - eprev)/(timers[1]/1.0e6);
 
     // integral of the error. Anti-windup applied by clamping. The integral is not performmed unless the conditions are met.
-    if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + e*deltaT;
+    if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + (e*timers[1]/1.0e6);
 
     // control signal
     float u = kp*e + kd*dedt + ki*eintegral;
 
     // commad for the motor
-    comm = (int) fabs(u);
-    if(comm > umax) comm = umax;
-    if(comm < (umax * -1)) comm = -1*umax;
+    comm_raw = (int) u;
+    if(comm_raw > umax) comm_raw = umax;
+    if(comm_raw < -umax) comm_raw = -1*umax;
+    
+    my_map(comm, comm_raw, -100, 100, 0, 180);
+    if(comm > 90 && comm < 102 && e != 0) comm = 102;
+    else if(comm < 90 && comm > 80 && e != 0) comm = 80;
 
     eprev = e;
   }
 };
 
-/*******************************************Auxiliary function prototypes****************************************/
-void readAngleOnSerial(int16_t &set_point);
-void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
-/****************************************************************************************************************/
 
 // variables for the connection interface of the sensors
 const uint8_t SDA_0 = 25;
@@ -77,18 +69,10 @@ const uint8_t SCL_1 = 16;
 const uint8_t servo_pin = 12;
 // variables used for angle control
 int16_t set_point;
-int16_t angle_encoder_1;
+int16_t angle_encoder_1; // These 3 variables will be packed in an array later
 int16_t angle_encoder_2;
-float prevT;
-float deltaT;
-long currT;
-int8_t comm;
-uint8_t servo_comm;
-uint8_t quadrant_number;
-uint8_t previous_quadrant_number;
-uint8_t number_of_turns;
-int32_t total_angle1;
-int32_t input;
+unsigned long timers[3];
+uint8_t comm;
 String in_string = "";
 
 // Initialization of the two wire objects for the ESP32
@@ -101,7 +85,7 @@ AS5600 as56001(&my_Wire1); // will use a different wire in the ESP32
 Servo my_servo;
 // Initialize the PID controllers for each motor
 PIDController pid_motor_1;
-PIDController pid_motor_2;
+PIDController pid_motor_2; // the PID controllers will be placed in an array
 
 int i = 0;
 int pos = 90;
@@ -123,92 +107,38 @@ void setup()
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
   as5600.resetCumulativePosition();
-
+  Serial.println("\n");
+  Serial.print("Servo comm");
+  Serial.print("\t");
+  Serial.print("T");
+  Serial.print("\t");
+  Serial.print("Input Angle");
+  Serial.print("\t");
+  Serial.println("Set Point");
 }
 
 
 void loop()
 {
-  // geting time stamp
-  currT = micros();
-  deltaT = (currT - prevT)/1.0e6;  
-  prevT = currT;
   // read angle and set point from the Serial port
   angle_encoder_1 = as5600.getCumulativePosition() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
   readAngleOnSerial(set_point);
-  // Quadrant 1
-  // if (angle_encoder_1 >= 0 && angle_encoder_1 <= 90)
-  // {
-  //   quadrant_number = 1;
-  // }
-  // // Quadrant 2
-  // if (angle_encoder_1 >= 90 && angle_encoder_1 <= 180) 
-  // {
-  //   quadrant_number = 2;
-  // }
-  // // Quadrant 3
-  // if (angle_encoder_1 >= 180 && angle_encoder_1 <= 270) 
-  // {
-  //   quadrant_number = 3;
-  // }
-  // // Quadrant 4
-  // if (angle_encoder_1 >= 270 && angle_encoder_1 <= 360) 
-  // {
-  //    quadrant_number = 4;
-  // }
 
-  // if (quadrant_number != previous_quadrant_number)
-  // {
-  //   // Transition from 4th to 1st quadrant
-  //   if (quadrant_number == 1 && previous_quadrant_number == 4)
-  //   {
-  //     number_of_turns++;
-  //   }
-  //   // Transition from 1st to 4th quadrant
-  //   if (quadrant_number == 4 && previous_quadrant_number == 1)
-  //   {
-  //     number_of_turns--;
-  //   }
-  //   previous_quadrant_number = quadrant_number;
-  // }
-  // if (total_angle1 >= 0)
-  // {
-  //   total_angle1 = (number_of_turns * 360) + angle_encoder_1;
-  // }
-  // else
-  // {
-  //   total_angle1 = (number_of_turns * 360) + angle_encoder_1;
-  // }
-
-  // // Establish Input value for PID
-  // input = total_angle1;
-
-  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
-  my_map(servo_comm, comm, -100, 100, 0, 180);
-  if(servo_comm > 92 && servo_comm < 100) servo_comm = 100;
-  else if(servo_comm < 92 && servo_comm > 82) servo_comm = 82;
-  my_servo.write(servo_comm);
+  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, timers);
+  my_servo.write(comm);
   
   if(i == 1000)
   {
-    Serial.print("Servo comm");
-    Serial.print("\t");
-    Serial.print("T");
-    Serial.print("\t");
-    Serial.print("Input Angle");
-    Serial.print("\t");
-    Serial.println("Set Point");
-    Serial.print(servo_comm);
+    Serial.print(comm);
     Serial.print("\t");
     Serial.print("\t");
-    Serial.print(deltaT*1.0e6);
+    Serial.print(timers[1] + (timers[0]-timers[2]));
     Serial.print("\t");
     Serial.print("\t");
     Serial.print(angle_encoder_1);
     Serial.print("\t");
     Serial.print("\t");
     Serial.println(set_point);
-    pid_motor_1.showParameters();
     i = 0;
   }
   i++;
