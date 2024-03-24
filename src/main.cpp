@@ -17,15 +17,14 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(5), kd(0), ki(0), umax(100), eintegral(0){}
+  PIDController(): kp(1.4217), kd(0), ki(0), umax(100), eintegral(0){}
 
   // function to set parameters
-  void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
+  void setParams(float kpIn, float kdIn, float kiIn)
   {
     kp = kpIn;
     kd = kdIn;
     ki = kiIn;
-    umax = umaxIn;
   }
   
   void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3])
@@ -115,6 +114,7 @@ void setup()
   Serial.print("Input Angle");
   Serial.print("\t");
   Serial.println("Set Point");
+  set_point = 90;
 }
 
 
@@ -127,21 +127,13 @@ void loop()
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, timers);
   my_servo.write(comm);
   
-  if(i == 1000)
-  {
-    Serial.print(comm);
-    Serial.print("\t");
-    Serial.print("\t");
-    Serial.print(timers[1] + (timers[0]-timers[2]));
-    Serial.print("\t");
-    Serial.print("\t");
-    Serial.print(angle_encoder_1);
-    Serial.print("\t");
-    Serial.print("\t");
-    Serial.println(set_point);
-    i = 0;
-  }
-  i++;
+  Serial.print(comm);
+  Serial.print(",");
+  Serial.print(timers[0]);
+  Serial.print(",");
+  Serial.print(angle_encoder_1);
+  Serial.print(",");
+  Serial.println(set_point);
 }
 
 void readAngleOnSerial(int16_t &set_point)
