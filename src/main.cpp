@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(5.), kd(0), ki(0), umax(100){}
+  PIDController(): kp(5), kd(0), ki(0), umax(100){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -122,9 +122,6 @@ void loop()
   // read angle and set point from the Serial port
   angle_encoder_1 = as5600.rawAngle() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
   readAngleOnSerial(set_point);
-  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
-  my_map(servo_comm, comm, -100, 100, 0, 180);
-  my_servo.write(servo_comm);
   // Quadrant 1
   if (angle_encoder_1 >= 0 && angle_encoder_1 <= 90)
   {
@@ -171,6 +168,10 @@ void loop()
 
   // Establish Input value for PID
   input = total_angle1;
+
+  pid_motor_1.evalActVar(input, set_point, comm, deltaT);
+  my_map(servo_comm, comm, -100, 100, 0, 180);
+  my_servo.write(servo_comm);
 }
 
 void readAngleOnSerial(int16_t &set_point)
