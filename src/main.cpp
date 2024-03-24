@@ -11,7 +11,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): kp(5), kd(0), ki(0), umax(100){}
+  PIDController(): kp(2), kd(0.2), ki(1), umax(100), eintegral(0){}
 
   // function to set parameters
   void setParams(float kpIn, float kdIn, float kiIn, float umaxIn)
@@ -24,10 +24,21 @@ class PIDController
   
   void showParameters()
   {
-    Serial.println(kp);
-    Serial.println(kd);
-    Serial.println(ki);
-    Serial.println(umax);
+    // Serial.print(kp);
+    // Serial.print("\t");
+    // Serial.print(kd);
+    // Serial.print("\t");
+    // Serial.print(ki);
+    // Serial.print("\t");
+    // Serial.print(umax);
+    // Serial.print("\t");
+    Serial.print("Previous e");
+    Serial.print("\t");
+    Serial.println("Integral e");
+    Serial.print(eprev);
+    Serial.print("\t");
+    Serial.print("\t");
+    Serial.println(eintegral);
   }
 
   void evalActVar(int16_t value, int16_t target, int8_t &comm, float deltaT)
@@ -38,8 +49,8 @@ class PIDController
     // derivative of the error
     float dedt = (e - eprev)/(deltaT);
 
-    // integral of the error
-    eintegral = eintegral + e*deltaT;
+    // integral of the error. Anti-windup applied by clamping. The integral is not performmed unless the conditions are met.
+    if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + e*deltaT;
 
     // control signal
     float u = kp*e + kd*dedt + ki*eintegral;
@@ -92,6 +103,9 @@ Servo my_servo;
 PIDController pid_motor_1;
 PIDController pid_motor_2;
 
+int i = 0;
+int pos = 90;
+
 void setup()
 {
   Serial.begin(9600);
@@ -120,58 +134,84 @@ void loop()
   deltaT = (currT - prevT)/1.0e6;  
   prevT = currT;
   // read angle and set point from the Serial port
-  angle_encoder_1 = as5600.rawAngle() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
+  angle_encoder_1 = as5600.getCumulativePosition() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
   readAngleOnSerial(set_point);
   // Quadrant 1
-  if (angle_encoder_1 >= 0 && angle_encoder_1 <= 90)
-  {
-    quadrant_number = 1;
-  }
-  // Quadrant 2
-  if (angle_encoder_1 >= 90 && angle_encoder_1 <= 180) 
-  {
-    quadrant_number = 2;
-  }
-  // Quadrant 3
-  if (angle_encoder_1 >= 180 && angle_encoder_1 <= 270) 
-  {
-    quadrant_number = 3;
-  }
-  // Quadrant 4
-  if (angle_encoder_1 >= 270 && angle_encoder_1 <= 360) 
-  {
-     quadrant_number = 4;
-  }
+  // if (angle_encoder_1 >= 0 && angle_encoder_1 <= 90)
+  // {
+  //   quadrant_number = 1;
+  // }
+  // // Quadrant 2
+  // if (angle_encoder_1 >= 90 && angle_encoder_1 <= 180) 
+  // {
+  //   quadrant_number = 2;
+  // }
+  // // Quadrant 3
+  // if (angle_encoder_1 >= 180 && angle_encoder_1 <= 270) 
+  // {
+  //   quadrant_number = 3;
+  // }
+  // // Quadrant 4
+  // if (angle_encoder_1 >= 270 && angle_encoder_1 <= 360) 
+  // {
+  //    quadrant_number = 4;
+  // }
 
-  if (quadrant_number != previous_quadrant_number)
-  {
-    // Transition from 4th to 1st quadrant
-    if (quadrant_number == 1 && previous_quadrant_number == 4)
-    {
-      number_of_turns++;
-    }
-    // Transition from 1st to 4th quadrant
-    if (quadrant_number == 4 && previous_quadrant_number == 1)
-    {
-      number_of_turns--;
-    }
-    previous_quadrant_number = quadrant_number;
-  }
-  if (total_angle1 >= 0)
-  {
-    total_angle1 = (number_of_turns * 360) + angle_encoder_1;
-  }
-  else
-  {
-    total_angle1 = (number_of_turns * 360) + angle_encoder_1;
-  }
+  // if (quadrant_number != previous_quadrant_number)
+  // {
+  //   // Transition from 4th to 1st quadrant
+  //   if (quadrant_number == 1 && previous_quadrant_number == 4)
+  //   {
+  //     number_of_turns++;
+  //   }
+  //   // Transition from 1st to 4th quadrant
+  //   if (quadrant_number == 4 && previous_quadrant_number == 1)
+  //   {
+  //     number_of_turns--;
+  //   }
+  //   previous_quadrant_number = quadrant_number;
+  // }
+  // if (total_angle1 >= 0)
+  // {
+  //   total_angle1 = (number_of_turns * 360) + angle_encoder_1;
+  // }
+  // else
+  // {
+  //   total_angle1 = (number_of_turns * 360) + angle_encoder_1;
+  // }
 
-  // Establish Input value for PID
-  input = total_angle1;
+  // // Establish Input value for PID
+  // input = total_angle1;
 
-  pid_motor_1.evalActVar(input, set_point, comm, deltaT);
+  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, deltaT);
   my_map(servo_comm, comm, -100, 100, 0, 180);
+  if(servo_comm > 92 && servo_comm < 100) servo_comm = 100;
+  else if(servo_comm < 92 && servo_comm > 82) servo_comm = 82;
   my_servo.write(servo_comm);
+  
+  if(i == 1000)
+  {
+    Serial.print("Servo comm");
+    Serial.print("\t");
+    Serial.print("T");
+    Serial.print("\t");
+    Serial.print("Input Angle");
+    Serial.print("\t");
+    Serial.println("Set Point");
+    Serial.print(servo_comm);
+    Serial.print("\t");
+    Serial.print("\t");
+    Serial.print(deltaT*1.0e6);
+    Serial.print("\t");
+    Serial.print("\t");
+    Serial.print(angle_encoder_1);
+    Serial.print("\t");
+    Serial.print("\t");
+    Serial.println(set_point);
+    pid_motor_1.showParameters();
+    i = 0;
+  }
+  i++;
 }
 
 void readAngleOnSerial(int16_t &set_point)
