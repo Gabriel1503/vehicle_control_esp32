@@ -6,7 +6,7 @@
 
 /*******************************************Auxiliary function prototypes****************************************/
 void readAngleOnSerial(int16_t &set_point);
-void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
+void my_map(uint8_t &out, int16_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
 /****************************************************************************************************************/
 
 class PIDController
@@ -33,12 +33,12 @@ class PIDController
     timers[0] = micros(); // current time
     timers[1] = (timers[0] - timers[2]); // delta t since previos time 
     timers[2] = timers[0]; // previous time for next iteration is the current time
-    int8_t comm_raw;
+    int16_t comm_raw;
     // error of the control value
     int16_t e = target - value;
     
     // derivative of the error
-    float dedt = (e - eprev)/(timers[1]/1.0e6);
+    float dedt = (e - eprev)/(timers[1]);
 
     // integral of the error. Anti-windup applied by clamping. The integral is not performmed unless the conditions are met.
     if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + (e*timers[1]/1.0e6);
@@ -157,7 +157,7 @@ void readAngleOnSerial(int16_t &set_point)
   }
 }
 
-void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max)
+void my_map(uint8_t &out, int16_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max)
 {
   const uint8_t run = in_max - in_min;
   const uint8_t rise = out_max - out_min;
