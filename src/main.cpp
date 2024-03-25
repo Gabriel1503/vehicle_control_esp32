@@ -12,19 +12,19 @@ void my_map(uint8_t &out, int8_t &in, int8_t in_min, int8_t in_max, uint8_t out_
 class PIDController
 {
   private:
-    float kp, kd, ki, umax; // constants that define the controller dynamics
+    float Kp, Kd, Ki, umax; // constants that define the controller dynamics
     float eprev, eintegral; // previous error and integral error, utilized for the derivative and integral calculations respectively
   
   public:
   // constructor
-  PIDController(): kp(1.4217), kd(0), ki(0), umax(100), eintegral(0){}
+  PIDController(): Kp(0.35), Kd(0), Ki(0), umax(100), eintegral(0){}
 
   // function to set parameters
-  void setParams(float kpIn, float kdIn, float kiIn)
+  void setParams(float kpIn, float KdIn, float KiIn)
   {
-    kp = kpIn;
-    kd = kdIn;
-    ki = kiIn;
+    Kp = kpIn;
+    Kd = KdIn;
+    Ki = KiIn;
   }
   
   void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3])
@@ -44,7 +44,7 @@ class PIDController
     if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + (e*timers[1]/1.0e6);
 
     // control signal
-    float u = kp*e + kd*dedt + ki*eintegral;
+    float u = Kp*e + Kd*dedt + Ki*eintegral;
 
     // commad for the motor
     comm_raw = (int) u;
@@ -52,8 +52,8 @@ class PIDController
     if(comm_raw < -umax) comm_raw = -1*umax;
     
     my_map(comm, comm_raw, -100, 100, 0, 180);
-    if(comm > 90 && comm < 102 && e != 0) comm = 102;
-    else if(comm < 90 && comm > 80 && e != 0) comm = 80;
+    if(comm >= 90 && comm < 102 && e != 0) comm = 102;
+    else if(comm <= 90 && comm > 80 && e != 0) comm = 80;
 
     eprev = e;
   }
@@ -106,15 +106,15 @@ void setup()
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
   as5600.resetCumulativePosition();
-  Serial.println("\n");
-  Serial.print("Servo comm");
-  Serial.print("\t");
-  Serial.print("T");
-  Serial.print("\t");
-  Serial.print("Input Angle");
-  Serial.print("\t");
-  Serial.println("Set Point");
-  set_point = 90;
+  // Serial.println("\n");
+  // Serial.print("Servo comm");
+  // Serial.print("\t");
+  // Serial.print("T");
+  // Serial.print("\t");
+  // Serial.print("Input Angle");
+  // Serial.print("\t");
+  // Serial.println("Set Point");
+  // set_point = 90;
 }
 
 
@@ -127,13 +127,13 @@ void loop()
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, timers);
   my_servo.write(comm);
   
-  Serial.print(comm);
-  Serial.print(",");
-  Serial.print(timers[0]);
-  Serial.print(",");
-  Serial.print(angle_encoder_1);
-  Serial.print(",");
-  Serial.println(set_point);
+  // Serial.print(comm);
+  // Serial.print(",");
+  // Serial.print(timers[0]);
+  // Serial.print(",");
+  // Serial.print(angle_encoder_1);
+  // Serial.print(",");
+  // Serial.println(set_point);
 }
 
 void readAngleOnSerial(int16_t &set_point)
