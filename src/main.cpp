@@ -17,14 +17,13 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): Kp(2.4), Kd(0.2), Ki(0), umax(100), eintegral(0){}
+  PIDController(): Kp(2.4), Kd(0.2), umax(100){}
 
   // function to set parameters
-  void setParams(float kpIn, float KdIn, float KiIn)
+  void setParams(float kpIn, float KdIn)
   {
     Kp = kpIn;
     Kd = KdIn;
-    Ki = KiIn;
   }
   
   void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3])
@@ -38,13 +37,10 @@ class PIDController
     int16_t e = target - value;
     
     // derivative of the error
-    float dedt = (e - eprev)/(timers[1]);
-
-    // integral of the error. Anti-windup applied by clamping. The integral is not performmed unless the conditions are met.
-    if((comm < umax && e > 0) || (comm > -umax && e < 0)) eintegral = eintegral + (e*timers[1]/1.0e6);
+    float dedt = (e - eprev)/(timers[1]/1.0e6);
 
     // control signal
-    float u = Kp*e + Kd*dedt + Ki*eintegral;
+    float u = Kp*e + Kd*dedt;
 
     // commad for the motor
     comm_raw = (int) u;
@@ -52,8 +48,8 @@ class PIDController
     if(comm_raw < -umax) comm_raw = -1*umax;
     
     my_map(comm, comm_raw, -100, 100, 0, 180);
-    if(comm >= 90 && comm < 102 && e != 0) comm = 102;
-    else if(comm <= 90 && comm > 80 && e != 0) comm = 80;
+    if(comm > 90 && comm < 102 && e != 0) comm = 102;
+    else if(comm < 90 && comm > 80 && e != 0) comm = 80;
 
     eprev = e;
   }
@@ -66,12 +62,12 @@ const uint8_t SCL_0 = 26;
 const uint8_t SDA_1 = 17;
 const uint8_t SCL_1 = 16;
 const uint8_t servo_pin = 12;
+uint8_t comm;
 // variables used for angle control
 int16_t set_point;
 int16_t angle_encoder_1; // These 3 variables will be packed in an array later
 int16_t angle_encoder_2;
 unsigned long timers[3];
-uint8_t comm;
 String in_string = "";
 
 // Initialization of the two wire objects for the ESP32
@@ -85,9 +81,6 @@ Servo my_servo;
 // Initialize the PID controllers for each motor
 PIDController pid_motor_1;
 PIDController pid_motor_2; // the PID controllers will be placed in an array
-
-int i = 0;
-int pos = 90;
 
 void setup()
 {
@@ -106,15 +99,6 @@ void setup()
   my_Wire0.begin(SDA_0, SCL_0, 100000);
   my_Wire1.begin(SDA_1, SCL_1, 100000);
   as5600.resetCumulativePosition();
-  // Serial.println("\n");
-  // Serial.print("Servo comm");
-  // Serial.print("\t");
-  // Serial.print("T");
-  // Serial.print("\t");
-  // Serial.print("Input Angle");
-  // Serial.print("\t");
-  // Serial.println("Set Point");
-  // set_point = 90;
 }
 
 
@@ -126,14 +110,6 @@ void loop()
 
   pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, timers);
   my_servo.write(comm);
-  
-  // Serial.print(comm);
-  // Serial.print(",");
-  // Serial.print(timers[0]);
-  // Serial.print(",");
-  // Serial.print(angle_encoder_1);
-  // Serial.print(",");
-  // Serial.println(set_point);
 }
 
 void readAngleOnSerial(int16_t &set_point)
