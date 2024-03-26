@@ -17,7 +17,7 @@ class PIDController
   
   public:
   // constructor
-  PIDController(): Kp(0.35), Kd(0), Ki(0), umax(100), eintegral(0){}
+  PIDController(): Kp(2.4), Kd(0.2), Ki(0), umax(100), eintegral(0){}
 
   // function to set parameters
   void setParams(float kpIn, float KdIn, float KiIn)
