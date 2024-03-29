@@ -63,7 +63,8 @@ const uint8_t SDA_1 = 17;
 const uint8_t SCL_1 = 16;
 const uint8_t servo_pin = 12;
 uint8_t comm;
-// variables used for angle control
+// variables used for angle control. A single set point can be used as the motors will  aways rotate the same amount. The direction will be 
+// decided by setting the direction on the sensor to clockwise or counterclockwise.
 int16_t set_point;
 int16_t angle_encoder_1; // These 3 variables will be packed in an array later
 int16_t angle_encoder_2;
