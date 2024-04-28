@@ -108,6 +108,7 @@ const char* MQTT_password = NULL;
 // mqtt server IP address (IP address of he computer)
 const char* mqtt_server = "";
 
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -133,7 +134,7 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     return;
   }
   PD_controller_inputs[0] = (int16_t)(side_len*180)/(r*PI);
-  for (uint8_t i = 0; i < path*2; i++)
+  for (uint8_t i = 0; i < path; i++)
   {
     encoders[0].resetCumulativePosition();
     encoders[1].resetCumulativePosition();
@@ -297,6 +298,8 @@ void setup()
   encoders[0].setDirection(AS5600_CLOCK_WISE);
   encoders[1].begin();
   encoders[1].setDirection(AS5600_COUNTERCLOCK_WISE); 
+  encoders[0].resetCumulativePosition();
+  encoders[1].resetCumulativePosition();
 }
 
 void loop()
