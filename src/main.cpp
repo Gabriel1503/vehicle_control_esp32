@@ -34,13 +34,15 @@ class PDController
     Kd = KdIn;
   }
   
-  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3], int16_t &eprev)
+  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3], int16_t &eprev, uint8_t dir)
   {
     // geting timer values
     timers[0] = micros(); // current time
     timers[1] = (timers[0] - timers[2]); // delta t since previos time 
     timers[2] = timers[0]; // previous time for next iteration is the current time
     int16_t comm_raw;
+    // setting the target to the opposite direction of rotation
+    if(dir == 1) target *= -1;
     // error of the control value
     int16_t e = target - value;
     
@@ -54,7 +56,8 @@ class PDController
     comm_raw = (int) u;
     if(comm_raw > umax) comm_raw = umax;
     if(comm_raw < -umax) comm_raw = -1*umax;
-    
+    // Set the direction of rotation of the motors as they are mirroed
+
     my_map(comm, comm_raw, -100, 100, 0, 180);
     if(comm > 90 && comm < 102 && e != 0) comm = 102;
     else if(comm < 90 && comm > 80 && e != 0) comm = 80;
@@ -130,7 +133,7 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     return;
   }
   PD_controller_inputs[0] = (int16_t)(side_len*180)/(r*PI);
-  for (uint8_t i = 0; i < path; i++)
+  for (uint8_t i = 0; i < path*2; i++)
   {
     encoders[0].resetCumulativePosition();
     encoders[1].resetCumulativePosition();
@@ -138,12 +141,11 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     while (counter < 300)
     {
       PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[0].evalActVar(PD_controller_inputs[1], PD_controller_inputs[0], comms[0], timers_1, errors[0]);
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], PD_controller_inputs[0], comms[0], timers_1, errors[0], 0);
       PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1]);
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1], 1);
       servos[0].write(comms[0]);
       servos[1].write(comms[1]);
-      Serial.print(PD_controller_inputs[1]);
       if (errors[0] < 5 && errors[1] < 5) counter++;
       else counter = 0;
     }
@@ -153,9 +155,9 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     while (counter < 300)
     {
       PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0], 0);
       PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1], 1);
       servos[0].write(comms[0]);
       servos[1].write(comms[1]);
       if (errors[0] < 5 && errors[1] < 5) counter++;
@@ -171,9 +173,9 @@ void goToAngle(int16_t angle, Servo servos[2])
   while (counter < 300)
   {
     PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-    motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
+    motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0], 0);
     PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
+    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1], 1);
     servos[0].write(comms[0]);
     servos[1].write(comms[1]);
     if (errors[0] < 5 && errors[1] < 5) counter++;
@@ -240,7 +242,7 @@ void callback(String topic, byte* message, uint8_t length)
     start = temp_message;
     if(start == "true")
     {
-      runPath(path_params[1], path_params[0], servo);
+      goToAngle(PD_controller_inputs[0], servo);
       client.publish("reset switch", "false");
       client.publish("reset path", "None");
       start = "";
@@ -275,7 +277,6 @@ void reconnect()
 
 void setup()
 {
-  Serial.begin(115200);
   // Initializing wifi connection
   setupWifi();
   // Setting MQTT server port
@@ -293,9 +294,9 @@ void setup()
   current_voltage_sensors[1].begin(&I2C_buses[1]);
   // Initializing and seting of the position sensors
   encoders[0].begin();
-  encoders[0].setDirection(1);
+  encoders[0].setDirection(AS5600_CLOCK_WISE);
   encoders[1].begin();
-  encoders[1].setDirection(0); 
+  encoders[1].setDirection(AS5600_COUNTERCLOCK_WISE); 
 }
 
 void loop()
@@ -308,11 +309,10 @@ void loop()
   if(!start_and_stop)
   {
     servo[0].write(102);
-    servo[1].write(102);
+    servo[1].write(80);
     delay(500);
     servo[0].write(90);
     servo[1].write(90);
-    delay(500);
     start_and_stop = true;
   }
   now = millis();
@@ -321,9 +321,11 @@ void loop()
     client.publish("angle", String(encoders[0].getCumulativePosition()).c_str());
     last_encoder_measure = now;
   }
-  if(now - last_current_and_voltage_measure >= 30000)
+  if(now - last_current_and_voltage_measure >= 10000)
   {
     client.publish("Status Monitoring/Solar Power production", String(current_voltage_sensors[1].getPower_mW()).c_str());
+    client.publish("Status Monitoring/Solar Cell Voltage", String(current_voltage_sensors[1].getBusVoltage_V()).c_str());
+    client.publish("Status Monitoring/Solar Cell Current", String(current_voltage_sensors[1].getCurrent_mA()).c_str());
     client.publish("Status Monitoring/Battery Status", String(current_voltage_sensors[0].getBusVoltage_V()).c_str()); 
     last_current_and_voltage_measure = now;  
   }
