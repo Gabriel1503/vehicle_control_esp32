@@ -1,23 +1,31 @@
-#include<Arduino.h>
-#include<AS5600.h>
-#include<Wire.h>
-#include<ESP32Servo.h>
+#include <Arduino.h>
+#include <PubSubClient.h>
+#include <Wire.h>
+#include <Adafruit_INA219.h>
+#include <AS5600.h>
+#include <ESP32Servo.h>
+#include <WiFi.h>
 
 
-/*******************************************Auxiliary function prototypes****************************************/
-void readAngleOnSerial(int16_t &set_point);
-void my_map(uint8_t &out, int16_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max);
-/****************************************************************************************************************/
+/******************Auxiliary Functions for computing the Servo Motor commands************************/
+void reconnect();
+void my_map(uint8_t &out, int16_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max)
+{
+  const uint8_t run = in_max - in_min;
+  const uint8_t rise = out_max - out_min;
+  const uint8_t delta = in - in_min;
+  out = (delta * rise) /(run + out_min);
+}
 
-class PIDController
+class PDController
 {
   private:
-    float Kp, Kd, Ki, umax; // constants that define the controller dynamics
-    float eprev, eintegral; // previous error and integral error, utilized for the derivative and integral calculations respectively
+    float Kp, Kd, umax; // constants that define the controller dynamics
+    float eprev; // previous error and integral error, utilized for the derivative and integral calculations respectively
   
   public:
   // constructor
-  PIDController(): Kp(2.4), Kd(0.2), umax(100){}
+  PDController(): Kp(2.4), Kd(0.2), umax(100), eprev(0){}
 
   // function to set parameters
   void setParams(float kpIn, float KdIn)
@@ -26,7 +34,7 @@ class PIDController
     Kd = KdIn;
   }
   
-  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3])
+  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3], int16_t &eprev)
   {
     // geting timer values
     timers[0] = micros(); // current time
@@ -55,89 +63,269 @@ class PIDController
   }
 };
 
+// Pins utilized for the servos
+const uint8_t servo_pins[] = {18, 19};
+// Array of path Parameters
+uint8_t path_params[2];
+int16_t PD_controller_inputs[3];
+uint8_t comms[2];
+int16_t errors[2];
+unsigned long timers_1[3];
+unsigned long timers_2[3];
+String start;
+// Declaring the necessary pins for the I2C and the relay control 
+const uint8_t SDA_0 = 5;
+const uint8_t SCL_0 = 23;
+const uint8_t SDA_1 = 21;
+const uint8_t SCL_1 = 17;
+const uint8_t relay_pin = 22;
+// boolean to set the movement of the motor after first connection
+bool start_and_stop = false;
+// variables to update the dashboard for the position sensors and the power voltage and current sensors
+long now = millis();
+long last_encoder_measure = 0;
+long last_current_and_voltage_measure = 0;
+// Initializing the two I2C buses that will be used for the sensors
+TwoWire I2C_buses[] = {TwoWire(0), TwoWire(1)};
+AS5600 encoders[] = {AS5600(&I2C_buses[0]), AS5600(&I2C_buses[1])};
+// Array with the INA219 sensors
+Adafruit_INA219 current_voltage_sensors[] = {Adafruit_INA219(), Adafruit_INA219()};
+// Array of servo motors
+Servo servo[] = {Servo(), Servo()};
+// Array with the PD controllers for each motor
+PDController motor_controllers[] = {PDController(), PDController()};
 
-// variables for the connection interface of the sensors
-const uint8_t SDA_0 = 25;
-const uint8_t SCL_0 = 26;
-const uint8_t SDA_1 = 17;
-const uint8_t SCL_1 = 16;
-const uint8_t servo_pin = 12;
-uint8_t comm;
-// variables used for angle control. A single set point can be used as the motors will  aways rotate the same amount. The direction will be 
-// decided by setting the direction on the sensor to clockwise or counterclockwise.
-int16_t set_point;
-int16_t angle_encoder_1; // These 3 variables will be packed in an array later
-int16_t angle_encoder_2;
-unsigned long timers[3];
-String in_string = "";
+// Wifi name and password where the device will be conneted
+const char* ssid = "";
+const char* password = "";
+// MQTT broker credentials
+const char* MQTT_username = NULL;
+const char* MQTT_password = NULL;
 
-// Initialization of the two wire objects for the ESP32
-TwoWire my_Wire0 = TwoWire(0);
-TwoWire my_Wire1 = TwoWire(1);
-// Initialize the sensors
-AS5600 as5600(&my_Wire0);   //  use default Wire
-AS5600 as56001(&my_Wire1); // will use a different wire in the ESP32
-// Initialize the servo object for test
-Servo my_servo;
-// Initialize the PID controllers for each motor
-PIDController pid_motor_1;
-PIDController pid_motor_2; // the PID controllers will be placed in an array
+// mqtt server IP address (IP address of he computer)
+const char* mqtt_server = "";
 
-void setup()
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
 {
-  Serial.begin(9600);
-  // Second sensor PWM set up 
-  // Wire.begin();
-  // Allow allocation of all timers
-	ESP32PWM::allocateTimer(0);
-	ESP32PWM::allocateTimer(1);
-	ESP32PWM::allocateTimer(2);
-	ESP32PWM::allocateTimer(3);
-	my_servo.setPeriodHertz(50);    
-	my_servo.attach(servo_pin, 1000, 2000);
-
-  // Second sensor PWM set up 
-  my_Wire0.begin(SDA_0, SCL_0, 100000);
-  my_Wire1.begin(SDA_1, SCL_1, 100000);
-  as5600.resetCumulativePosition();
-}
-
-
-void loop()
-{
-  // read angle and set point from the Serial port
-  angle_encoder_1 = as5600.getCumulativePosition() * AS5600_RAW_TO_DEGREES;   //Serial output to visualize in Serial Plotter
-  readAngleOnSerial(set_point);
-
-  pid_motor_1.evalActVar(angle_encoder_1, set_point, comm, timers);
-  my_servo.write(comm);
-}
-
-void readAngleOnSerial(int16_t &set_point)
-{
-  while (Serial.available() > 0) 
+  int16_t angle = 0;
+  const float r = 3.5;
+  switch (path)
   {
-    int in_char = Serial.read();
-    if (isDigit(in_char) || in_char == '-')
+  case 3:
+    angle = 150; 
+    break;
+  case 4:
+    angle = 45;
+    break;
+  case 5:
+    angle = 36;
+    break;
+  case 6:
+    angle = 30;
+    break; 
+  default:
+    return;
+  }
+  PD_controller_inputs[0] = (int16_t)(side_len*180)/(r*PI);
+  for (uint8_t i = 0; i < path; i++)
+  {
+    encoders[0].resetCumulativePosition();
+    encoders[1].resetCumulativePosition();
+    uint16_t counter = 0;
+    while (counter < 300)
     {
-      // convert the incoming byte to a char and add it to the string:
-      in_string += (char)in_char;
+      PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], PD_controller_inputs[0], comms[0], timers_1, errors[0]);
+      PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1]);
+      servos[0].write(comms[0]);
+      servos[1].write(comms[1]);
+      Serial.print(PD_controller_inputs[1]);
+      if (errors[0] < 5 && errors[1] < 5) counter++;
+      else counter = 0;
     }
-    // if you get a newline, print the string, then the string's value:
-    if (in_char == '\n')
+    counter = 0;
+    encoders[0].resetCumulativePosition();
+    encoders[1].resetCumulativePosition();
+    while (counter < 300)
     {
-      set_point = in_string.toInt(); 
-      Serial.println(set_point);
-      in_string = "";
-      // clear the string for new input:
+      PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
+      PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
+      servos[0].write(comms[0]);
+      servos[1].write(comms[1]);
+      if (errors[0] < 5 && errors[1] < 5) counter++;
+      else counter = 0;
+    }
+    if(!client.connected()) reconnect();
+  }
+}
+
+void goToAngle(int16_t angle, Servo servos[2])
+{
+  uint16_t counter = 0;
+  while (counter < 300)
+  {
+    PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+    motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
+    PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
+    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
+    servos[0].write(comms[0]);
+    servos[1].write(comms[1]);
+    if (errors[0] < 5 && errors[1] < 5) counter++;
+    else counter = 0;
+  }
+  if(!client.connected()) reconnect();
+}
+
+// Function to connet the ESP32 to the router
+void setupWifi()
+{
+  delay(10);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+  }
+}
+
+// Functions that will be executed when some device publishes a message
+// to a topic that the esp8266 is subscribed to.
+void callback(String topic, byte* message, uint8_t length)
+{
+  String temp_message;
+  // Checking the topic of message so the message can be converted to the correct type
+  if(topic == "side_length")
+  {
+    int temp_length = 0;
+
+    for (uint8_t i = 0; i < length; i++) temp_message += (char)message[i];
+    
+    temp_length = temp_message.toInt();
+    path_params[0] = (uint8_t)temp_length;
+  }
+  else if (topic == "set_path")
+  {
+    for (uint8_t i = 0; i < length; i++) temp_message += (char)message[i];
+    int set_path = temp_message.toInt();
+    path_params[1] = (uint8_t) set_path;
+  }
+  else if(topic == "start")
+  {
+    for(uint8_t i = 0; i < length; i++) temp_message += (char)message[i];
+    start = temp_message;
+    if(start == "true")
+    {
+      runPath(path_params[1], path_params[0], servo);
+      client.publish("reset switch", "false");
+      client.publish("reset path", "None");
+      start = "";
+    }
+  }
+  else if(topic == "set_angle")
+  {
+    int16_t temp_angle = 0;
+    for (uint8_t i = 0; i < length; i++) temp_message += (char)message[i];
+    
+    temp_angle = temp_message.toInt();
+    PD_controller_inputs[0] = (int16_t) temp_angle; 
+  }
+  else if(topic == "Move")
+  {
+    for(uint8_t i = 0; i < length; i++) temp_message += (char)message[i];
+    start = temp_message;
+    if(start == "true")
+    {
+      runPath(path_params[1], path_params[0], servo);
+      client.publish("reset switch", "false");
+      client.publish("reset path", "None");
+      start = "";
     }
   }
 }
 
-void my_map(uint8_t &out, int16_t &in, int8_t in_min, int8_t in_max, uint8_t out_min, uint8_t out_max)
+// function reconnects the ESP8266 to the MQTT broker
+void reconnect()
 {
-  const uint8_t run = in_max - in_min;
-  const uint8_t rise = out_max - out_min;
-  const uint8_t delta = in - in_min;
-  out = (delta * rise) /(run + out_min);
+  // Loop until the connection is restablashed
+  while(!client.connected())
+  {
+    if(client.connect("espClient", MQTT_username, MQTT_password))
+    {
+      // subscribe or resubscribe to topics
+      client.subscribe("side_length");
+      client.subscribe("set_path");
+      client.subscribe("start");
+      client.subscribe("Move");
+      client.subscribe("set_angle");
+      client.subscribe("Kp");
+      client.subscribe("Kd");
+    }
+    else
+    {
+      // wait 5 seconds
+      delay(5000);
+    }
+  }
 }
+
+void setup()
+{
+  Serial.begin(115200);
+  // Initializing wifi connection
+  setupWifi();
+  // Setting MQTT server port
+  client.setServer(mqtt_server, 1883);
+  // Setting the callback function for comminicating with the dashboard
+  client.setCallback(callback);
+  // Starting the I2C buses in the correct pins
+  I2C_buses[0].begin(SDA_0, SCL_0);
+  I2C_buses[1].begin(SDA_1, SCL_1);
+  // Attaching servos to their respective pins
+  servo[0].attach(18);
+  servo[1].attach(19);
+  // initialize the sensors
+  current_voltage_sensors[0].begin(&I2C_buses[0]);
+  current_voltage_sensors[1].begin(&I2C_buses[1]);
+  // Initializing and seting of the position sensors
+  encoders[0].begin();
+  encoders[0].setDirection(1);
+  encoders[1].begin();
+  encoders[1].setDirection(0); 
+}
+
+void loop()
+{
+  // loop will ensure that the board is connected to the broker
+  if(!client.connected()) reconnect();
+  if(!client.loop()) client.connect("espClient", MQTT_username, MQTT_password);
+
+  // After connecting the vehicle moves a little nad then stops to indicate all is working as desired
+  if(!start_and_stop)
+  {
+    servo[0].write(102);
+    servo[1].write(102);
+    delay(500);
+    servo[0].write(90);
+    servo[1].write(90);
+    delay(500);
+    start_and_stop = true;
+  }
+  now = millis();
+  if(now - last_encoder_measure >= 1000)
+  {
+    client.publish("angle", String(encoders[0].getCumulativePosition()).c_str());
+    last_encoder_measure = now;
+  }
+  if(now - last_current_and_voltage_measure >= 30000)
+  {
+    client.publish("Status Monitoring/Solar Power production", String(current_voltage_sensors[1].getPower_mW()).c_str());
+    client.publish("Status Monitoring/Battery Status", String(current_voltage_sensors[0].getBusVoltage_V()).c_str()); 
+    last_current_and_voltage_measure = now;  
+  }
+}
+// Have to make some proibing of the used cores and the set up the second core for reading and posting the measurements from the sensors
