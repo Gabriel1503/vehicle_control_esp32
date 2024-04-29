@@ -34,15 +34,13 @@ class PDController
     Kd = KdIn;
   }
   
-  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3], int16_t &eprev, uint8_t dir)
+  void evalActVar(int16_t value, int16_t target, uint8_t &comm, unsigned long timers[3], int16_t &eprev)
   {
     // geting timer values
     timers[0] = micros(); // current time
     timers[1] = (timers[0] - timers[2]); // delta t since previos time 
     timers[2] = timers[0]; // previous time for next iteration is the current time
     int16_t comm_raw;
-    // setting the target to the opposite direction of rotation
-    if(dir == 1) target *= -1;
     // error of the control value
     int16_t e = target - value;
     
@@ -142,9 +140,9 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     while (counter < 300)
     {
       PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[0].evalActVar(PD_controller_inputs[1], PD_controller_inputs[0], comms[0], timers_1, errors[0], 0);
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], PD_controller_inputs[0], comms[0], timers_1, errors[0]);
       PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1], 1);
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1]);
       servos[0].write(comms[0]);
       servos[1].write(comms[1]);
       if (errors[0] < 5 && errors[1] < 5) counter++;
@@ -156,9 +154,9 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     while (counter < 300)
     {
       PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0], 0);
+      motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
       PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-      motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1], 1);
+      motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
       servos[0].write(comms[0]);
       servos[1].write(comms[1]);
       if (errors[0] < 5 && errors[1] < 5) counter++;
@@ -174,9 +172,9 @@ void goToAngle(int16_t angle, Servo servos[2])
   while (counter < 300)
   {
     PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-    motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0], 0);
+    motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0]);
     PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1], 1);
+    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1]);
     servos[0].write(comms[0]);
     servos[1].write(comms[1]);
     if (errors[0] < 5 && errors[1] < 5) counter++;
@@ -288,8 +286,8 @@ void setup()
   I2C_buses[0].begin(SDA_0, SCL_0);
   I2C_buses[1].begin(SDA_1, SCL_1);
   // Attaching servos to their respective pins
-  servo[0].attach(18);
-  servo[1].attach(19);
+  servo[0].attach(servo_pins[0]);
+  servo[1].attach(servo_pins[1]);
   // initialize the sensors
   current_voltage_sensors[0].begin(&I2C_buses[0]);
   current_voltage_sensors[1].begin(&I2C_buses[1]);
@@ -322,6 +320,7 @@ void loop()
   if(now - last_encoder_measure >= 1000)
   {
     client.publish("angle", String(encoders[0].getCumulativePosition()).c_str());
+    client.publish("angle1", String(encoders[1].getCumulativePosition()).c_str());
     last_encoder_measure = now;
   }
   if(now - last_current_and_voltage_measure >= 10000)
