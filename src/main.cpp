@@ -133,9 +133,10 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
     return;
   }
   PD_controller_inputs[0] = (int16_t)(side_len*180)/(r*PI);
-  uint16_t counter = 0;
+  uint16_t counter;
   for (uint8_t i = 0; i < path; i++)
   {
+    counter = 0;
     encoders[0].resetCumulativePosition();
     encoders[1].resetCumulativePosition();
     delay(100);
@@ -320,18 +321,6 @@ void loop()
   if(!client.connected()) reconnect();
   if(!client.loop()) client.connect("espClient", MQTT_username, MQTT_password);
 
-  // // After connecting the vehicle moves a little nad then stops to indicate all is working as desired
-  // if(!start_and_stop)
-  // {
-  //   servo[0].write(102);
-  //   servo[1].write(80);
-  //   delay(500);
-  //   servo[0].write(90);
-  //   servo[1].write(90);
-  //   start_and_stop = true;
-  //   encoders[0].resetCumulativePosition();
-  //   encoders[1].resetCumulativePosition();
-  // }
   now = millis();
   if(now - last_encoder_measure >= 1000)
   {
