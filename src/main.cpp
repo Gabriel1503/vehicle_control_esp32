@@ -25,7 +25,7 @@ class PDController
   
   public:
   // constructor
-  PDController(): Kp(0.5), Kd(0), umax(100), eprev(0){}
+  PDController(): Kp(0.5), Kd(0.0), umax(100), eprev(0){}
 
   // function to set parameters
   void setParams(float kpIn, float KdIn)
@@ -117,20 +117,20 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
   const float r = 3.5;
   switch (path)
   {
-  case 3:
-    angle = 150; 
-    break;
-  case 4:
-    angle = 45;
-    break;
-  case 5:
-    angle = 36;
-    break;
-  case 6:
-    angle = 30;
-    break; 
-  default:
-    return;
+    case 3:
+      angle = 240; 
+      break;
+    case 4:
+      angle = 180;
+      break;
+    case 5:
+      angle = 144;
+      break;
+    case 6:
+      angle = 120;
+      break; 
+    default:
+      return;
   }
   PD_controller_inputs[0] = (int16_t)(side_len*180)/(r*PI);
   uint16_t counter;
@@ -148,7 +148,7 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
       motor_controllers[1].evalActVar(PD_controller_inputs[2], PD_controller_inputs[0], comms[1], timers_2, errors[1],1);
       servos[0].write(comms[0]);
       servos[1].write(comms[1]);
-      if (errors[0] < 5 && errors[1] < 5) counter++;
+      if (abs(errors[0]) < 5 && abs(errors[1]) < 5) counter++;
       else counter = 0;
     }
     counter = 0;
@@ -181,7 +181,7 @@ void goToAngle(int16_t angle, Servo servos[2])
     PD_controller_inputs[1] = encoders[0].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
     motor_controllers[0].evalActVar(PD_controller_inputs[1], angle, comms[0], timers_1, errors[0],0);
     PD_controller_inputs[2] = encoders[1].getCumulativePosition() * AS5600_RAW_TO_DEGREES;
-    motor_controllers[1].evalActVar(PD_controller_inputs[2], angle, comms[1], timers_2, errors[1],1);
+    motor_controllers[1].evalActVar(PD_controller_inputs[2], -angle, comms[1], timers_2, errors[1],1);
     servos[0].write(comms[0]);
     servos[1].write(comms[1]);
     if (errors[0] < 5 && errors[1] < 5) counter++;
