@@ -81,6 +81,8 @@ const uint8_t SCL_0 = 23;
 const uint8_t SDA_1 = 21;
 const uint8_t SCL_1 = 17;
 const uint8_t relay_pin = 22;
+// Distance between the center of the wheels of the vehicle in cm
+const float wheels_dist = 12.86;
 // boolean to set the movement of the motor after first connection
 bool start_and_stop = false;
 // variables to update the dashboard for the position sensors and the power voltage and current sensors
@@ -118,16 +120,16 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
   switch (path)
   {
     case 3:
-      angle = 240; 
+      angle = (int16_t) (120/360) * (12.86/7); 
       break;
     case 4:
-      angle = 180;
+      angle = (int16_t) (90/360) * (12.86/7);
       break;
     case 5:
-      angle = 144;
+      angle = (int16_t) (72/360) * (12.86/7);
       break;
     case 6:
-      angle = 120;
+      angle = (int16_t) (60/360) * (12.86/7);
       break; 
     default:
       return;
