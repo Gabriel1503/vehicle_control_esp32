@@ -82,7 +82,7 @@ const uint8_t SDA_1 = 21;
 const uint8_t SCL_1 = 17;
 const uint8_t relay_pin = 22;
 // Distance between the center of the wheels of the vehicle in cm
-const float wheels_dist = 12.86;
+const float diameter_ratio = 12.86/7.0;
 // boolean to set the movement of the motor after first connection
 bool start_and_stop = false;
 // variables to update the dashboard for the position sensors and the power voltage and current sensors
@@ -120,16 +120,16 @@ void runPath(uint8_t path, uint8_t side_len, Servo servos[2])
   switch (path)
   {
     case 3:
-      angle = (int16_t) (120/360) * (12.86/7); 
+      angle = (int16_t) ((120.0/360) * diameter_ratio * 360); 
       break;
     case 4:
-      angle = (int16_t) (90/360) * (12.86/7);
+      angle = (int16_t) ((90.0/360) * diameter_ratio * 360);
       break;
     case 5:
-      angle = (int16_t) (72/360) * (12.86/7);
+      angle = (int16_t) ((72.0/360) * diameter_ratio * 360);
       break;
     case 6:
-      angle = (int16_t) (60/360) * (12.86/7);
+      angle = (int16_t) ((60.0/360) * diameter_ratio * 360);
       break; 
     default:
       return;
@@ -293,7 +293,6 @@ void reconnect()
 
 void setup()
 {
-  Serial.begin(9600);
   // Initializing wifi connection
   setupWifi();
   // Setting MQTT server port
@@ -322,7 +321,6 @@ void loop()
   // loop will ensure that the board is connected to the broker
   if(!client.connected()) reconnect();
   if(!client.loop()) client.connect("espClient", MQTT_username, MQTT_password);
-
   now = millis();
   if(now - last_encoder_measure >= 1000)
   {
