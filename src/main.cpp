@@ -335,6 +335,7 @@ void loop()
     client.publish("Status Monitoring/Solar Cell Current", String(current_voltage_sensors[1].getCurrent_mA()).c_str());
     client.publish("Status Monitoring/Battery Status", String(current_voltage_sensors[0].getBusVoltage_V()).c_str()); 
     last_current_and_voltage_measure = now;  
+    if(current_voltage_sensors[0].getBusVoltage_V() > 3.9) digitalWrite(relay_pin, HIGH);
   }
 }
 // Have to make some proibing of the used cores and the set up the second core for reading and posting the measurements from the sensors
