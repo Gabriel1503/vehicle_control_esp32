@@ -25,7 +25,7 @@ class PDController
   
   public:
   // constructor
-  PDController(): Kp(0.5), Kd(0.0), umax(100), eprev(0){}
+  PDController(): Kp(0.5), Kd(0.001), umax(100), eprev(0){}
 
   // function to set parameters
   void setParams(float kpIn, float KdIn)
