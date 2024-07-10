@@ -338,4 +338,3 @@ void loop()
     if(current_voltage_sensors[0].getBusVoltage_V() > 3.9) digitalWrite(relay_pin, HIGH);
   }
 }
-// Have to make some proibing of the used cores and the set up the second core for reading and posting the measurements from the sensors
