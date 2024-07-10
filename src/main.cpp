@@ -105,8 +105,8 @@ PDController motor_controllers[] = {PDController(), PDController()};
 const char* ssid = SS_ID;
 const char* password = Wi_FI_PASS;
 // MQTT broker credentials
-const char* MQTT_username = NULL;
-const char* MQTT_password = NULL;
+const char* MQTT_username = MQTT_USERNAME;
+const char* MQTT_password = MQTT_PASS;
 
 // mqtt server IP address (IP address of he computer)
 const char* mqtt_server = IP_ADDRESS;
