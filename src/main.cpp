@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <Wire.h>
@@ -100,14 +102,14 @@ Servo servo[] = {Servo(), Servo()};
 PDController motor_controllers[] = {PDController(), PDController()};
 
 // Wifi name and password where the device will be conneted
-const char* ssid = "";
-const char* password = "";
+const char* ssid = SS_ID;
+const char* password = Wi_FI_PASS;
 // MQTT broker credentials
 const char* MQTT_username = NULL;
 const char* MQTT_password = NULL;
 
 // mqtt server IP address (IP address of he computer)
-const char* mqtt_server = "";
+const char* mqtt_server = IP_ADDRESS;
 
 
 WiFiClient espClient;
